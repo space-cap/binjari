@@ -69,6 +69,20 @@ export default function Home() {
     }
   }, [isMapView]);
 
+  // 카카오맵 SDK 동적 주입
+  useEffect(() => {
+    if (!isMapView) return;
+
+    const existingScript = document.getElementById("kakao-map-sdk");
+    if (existingScript) return;
+
+    const script = document.createElement("script");
+    script.id = "kakao-map-sdk";
+    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${process.env.NEXT_PUBLIC_KAKAO_MAP_CLIENT_KEY}&autoload=false`;
+    script.async = true;
+    document.head.appendChild(script);
+  }, [isMapView]);
+
   // 카카오 지도 초기화 및 마커 렌더링
   useEffect(() => {
     if (!isMapView || !mapContainerRef.current) return;
@@ -190,7 +204,7 @@ export default function Home() {
         </header>
 
         {/* 카카오 지도 영역 */}
-        <div ref={mapContainerRef} className="flex-1 w-full bg-zinc-950" />
+        <div ref={mapContainerRef} className="w-full bg-zinc-950" style={{ height: "calc(100vh - 56px)" }} />
 
         {/* 선택한 오피스 공간 요약 정보 오버레이 카드 */}
         {selectedSpace && (
