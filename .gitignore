@@ -1,0 +1,56 @@
+# Dependencies
+**/node_modules
+**/package-lock.json
+
+# Next.js build outputs
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/.eslintcache
+
+# NestJS build outputs
+backend/dist/
+backend/tsconfig.tsbuildinfo
+backend/.nest/
+
+# Local File Uploads (PRD 전략에 따른 로컬 이미지 저장 방지)
+**/uploads/
+**/temp-uploads/
+
+# Local DB Data (Docker 또는 로컬 DB 볼륨 디렉토리 방지)
+**/pg-data/
+**/db-data/
+
+# IDE / System files
+.DS_Store
+.AppleDouble
+.LSOverride
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local.php
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+*.log
+
+# OS files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+db.json

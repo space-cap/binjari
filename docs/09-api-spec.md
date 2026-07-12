@@ -1,8 +1,8 @@
-﻿# 빈자리 API 명세
+# 빈자리 API 명세
 
 > Version 0.1 | Last Updated: 2026-07-12
 >
-> Base URL: `https://api.binjari.kr/v1` (운영) | `http://localhost:3000/v1` (개발)
+> Base URL: `https://api.binjari.kr/v1` (운영) | `http://localhost:4000/v1` (개발)
 >
 > 인증: `Authorization: Bearer {access_token}`
 

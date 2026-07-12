@@ -1,4 +1,4 @@
-﻿# 빈자리 핵심 플로우
+# 빈자리 핵심 플로우
 
 > Version 0.1 | Last Updated: 2026-07-12
 
@@ -7,16 +7,16 @@
 # Flow 1. 인증 플로우 (카카오 OAuth)
 
 ```
-[앱] 카카오 로그인 버튼 클릭
+[웹] 카카오 로그인 버튼 클릭
   │
   ▼
 [카카오] 카카오 로그인 화면 표시
   │  사용자 로그인 완료
   ▼
-[카카오] kakao_access_token 발급 → 앱으로 전달
+[카카오] kakao_access_token 발급 → 웹 브라우저로 전달
   │
   ▼
-[앱] POST /auth/kakao { kakao_access_token }
+[웹] POST /auth/kakao { kakao_access_token }
   │
   ▼
 [서버] 카카오 API로 사용자 정보 조회
@@ -31,22 +31,23 @@
   │   Refresh Token (만료: 30일) → DB refresh_tokens 저장
   │
   ▼
-[앱] access_token + refresh_token 로컬 저장
-  │   (SecureStore — iOS Keychain / Android Keystore)
+[웹] access_token + refresh_token 저장
+  │   (Access Token: LocalStorage 또는 메모리 상태 관리)
+  │   (Refresh Token: Secure Cookie - HttpOnly, SameSite=Lax 설정 권장)
   │
   ▼
-[앱] 홈 화면으로 이동
+[웹] 홈 화면(지도)으로 이동
 
 ---
 
 [Access Token 만료 시]
-[앱] API 요청 → 401 응답 수신
+[웹] API 요청 → 401 응답 수신
   │
   ▼
-[앱] POST /auth/refresh { refresh_token }
+[웹] POST /auth/refresh { refresh_token }
   │
   ├─ 유효한 경우 → 새 access_token 발급
-  └─ 만료된 경우 → 로그인 화면으로 이동
+  └─ 만료된 경우 → 로그인/랜딩 페이지로 이동
 ```
 
 ---
@@ -54,13 +55,13 @@
 # Flow 2. 예약 + 결제 플로우
 
 ```
-[Guest] 공간 검색 → 상세 화면
+[Guest] 공간 검색 → 상세 페이지
   │
   ▼
 [Guest] 날짜 선택 + 메시지 입력 + "예약 요청" 버튼
   │
   ▼
-[앱] POST /bookings
+[웹] POST /bookings
   │   { space_id, start_date, end_date, unit, guest_message }
   │
   ▼
@@ -72,15 +73,16 @@
   └─ 성공 → booking 생성 (status: pending)
   │
   ▼
-[서버] Host에게 푸시 알림 발송
-  │   "새 예약 요청이 들어왔습니다"
+[서버] Host에게 알림 발송
+  │   (브라우저 Web Push 및 휴대폰 문자/알림톡 발송)
+  │   "새 예약 요청이 들어왔습니다: 링크 연결"
   │
   ▼
-[Host 앱] 예약 요청 수신 → 수락/거절 선택
+[Host 웹] 예약 요청 수신 (알림톡 링크 클릭 진입) → 수락/거절 선택
   │
   ├─ 거절 → PATCH /bookings/:id/reject
   │    └─ booking status: cancelled
-  │    └─ Guest에게 거절 알림 발송
+  │    └─ Guest에게 거절 문자/알림 발송
   │
   └─ 수락 → PATCH /bookings/:id/confirm
        │
@@ -88,32 +90,32 @@
       [서버] booking status: confirmed
        │
        ▼
-      [Guest 앱] 예약 확정 알림 수신
+      [Guest 웹] 예약 확정 알림 수신 (알림톡/문자)
        │
        ▼
       [Guest] 결제 화면 이동 → 결제 수단 선택
        │
        ▼
-      [토스페이먼츠] 결제창 표시 → 사용자 결제 완료
-       │   토스가 payment_key + order_id 반환
+      [토스페이먼츠] 웹 결제창 표시 → 사용자 결제 완료
+       │   토스 SDK가 payment_key + order_id 반환
        │
        ▼
-      [앱] POST /payments
+      [웹] POST /payments
        │   { booking_id, payment_key, order_id, amount }
        │
        ▼
       [서버] 토스 API로 결제 최종 승인 요청
        │   금액 검증 (조작 방지)
        │
-       ├─ 실패 → payment status: failed → Guest에게 오류 알림
+       ├─ 실패 → payment status: failed → Guest에게 웹 내 오류 화면 렌더링
        └─ 성공 → payment status: completed
             │
             ▼
-           [서버] 입실 안내 문자 자동 발송 (SMS)
-            │   "예약이 확정됐습니다. 입실 방법: ..."
+           [서버] 입실 안내 문자(SMS/알림톡) 자동 발송
+            │   "예약이 확정됐습니다. 입실 상세: https://binjari.kr/bookings/{id}"
             │
             ▼
-           [앱] 예약 완료 화면 표시
+           [웹] 예약 완료 페이지 표시
 
 ---
 
@@ -153,10 +155,10 @@
 [Host] 공간 등록 중 사진 선택 (최대 10장)
   │
   ▼
-[앱] 이미지 압축 처리 (최대 1MB로 리사이즈)
+[웹] 이미지 클라이언트 사이드 압축 (Web Worker 또는 Canvas 리사이즈)
   │
   ▼
-[앱] POST /spaces/:id/images (multipart/form-data)
+[웹] POST /spaces/:id/images (multipart/form-data)
   │
   ▼
 [서버] 파일 유효성 검사
@@ -192,7 +194,7 @@
 [서버] space_images 테이블에 URL 저장
   │
   ▼
-[앱] 업로드된 이미지 미리보기 표시
+[웹] 업로드된 이미지 미리보기 목록 업데이트 및 표시
 
 ---
 
@@ -215,12 +217,12 @@ OCI Object Storage
   ▼
 [서버] notifications 테이블에 레코드 저장
   │
+  ├─ Web Push 구독 정보 존재 시 → Web Push 프로토콜을 사용해 브라우저 알림 전송
+  │                                [웹] 브라우저 알림 팝업 수신
+  │
+  └─ 알리고 API 연동 → 비즈니스 성격에 따라 등록된 휴대폰 번호로 알림톡/SMS 발송
+                         (예: "예약 요청이 접수되었습니다. 수락 대기 중입니다.")
+  │
   ▼
-[서버] 수신자의 FCM 토큰 조회
-  │
-  ├─ 토큰 있음 → Firebase FCM으로 푸시 발송
-  │               [앱] 푸시 알림 수신 + 배지 업데이트
-  │
-  └─ 토큰 없음 → 앱 내 알림함에만 저장
-                  (다음 접속 시 확인 가능)
+[웹] 웹 내부 알림함 데이터 최신화 (다음 페이지 새로고침 or 웹소켓 연결 시 즉시 확인 가능)
 ```
