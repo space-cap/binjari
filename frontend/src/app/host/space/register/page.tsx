@@ -10,6 +10,10 @@ export default function SpaceRegister() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // 다중 이미지 업로드 상태
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
+
   // 입력 폼 상태 관리
   const [formData, setFormData] = useState({
     title: "",
@@ -60,6 +64,31 @@ export default function SpaceRegister() {
     });
   };
 
+  // 이미지 파일 선택 제어
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const filesArray = Array.from(e.target.files);
+      
+      // 최대 10장 한도 제어
+      if (selectedFiles.length + filesArray.length > 10) {
+        alert("사진은 최대 10장까지만 업로드할 수 있습니다.");
+        return;
+      }
+
+      setSelectedFiles((prev) => [...prev, ...filesArray]);
+      const urls = filesArray.map(file => URL.createObjectURL(file));
+      setPreviewUrls((prev) => [...prev, ...urls]);
+    }
+  };
+
+  const removeFile = (index: number) => {
+    // 메모리 누수 방지용 ObjectURL 파괴
+    URL.revokeObjectURL(previewUrls[index]);
+    
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
+    setPreviewUrls((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const nextStep = () => setStep(prev => prev + 1);
   const prevStep = () => setStep(prev => prev - 1);
 
@@ -67,11 +96,40 @@ export default function SpaceRegister() {
     setLoading(true);
     setError(null);
     try {
-      // API 전송 스펙으로 포맷팅
+      let uploadedUrls: string[] = [];
+
+      // 1. 선택된 로컬 사진이 있는 경우 백엔드 파일 업로드 API 선행 수행
+      if (selectedFiles.length > 0) {
+        const formDataObj = new FormData();
+        selectedFiles.forEach((file) => {
+          formDataObj.append("files", file);
+        });
+
+        const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000/v1";
+        const token = localStorage.getItem("access_token");
+
+        const uploadRes = await fetch(`${backendUrl}/spaces/upload`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formDataObj,
+        });
+
+        if (!uploadRes.ok) {
+          const errBody = await uploadRes.json().catch(() => ({}));
+          throw new Error(errBody.message || "사진 업로드 중 서버 에러가 발생했습니다.");
+        }
+
+        const uploadData = await uploadRes.json();
+        uploadedUrls = uploadData.urls || [];
+      }
+
+      // 2. 획득한 이미지 URL 목록을 payload.images 에 주입하여 공간 생성 최종 요청
       const payload = {
         ...formData,
-        // 빈자리 주소 요약 파싱 (예: 서울특별시 마포구 서교동 -> 마포구 서교동)
         addressSummary: formData.addressSummary || formData.address.split(" ").slice(1, 3).join(" ") || "서울시",
+        images: uploadedUrls,
       };
 
       await fetchApi("/spaces", {
@@ -115,7 +173,7 @@ export default function SpaceRegister() {
               <p className="text-xs text-zinc-400">프리랜서가 알아보기 쉽게 작성해 주세요.</p>
             </div>
             
-            <div className="flex flex-col gap-2 mt-4">
+            <div className="flex flex-col gap-2 mt-2">
               <label className="text-xs text-zinc-400">공간명 (최대 200자)</label>
               <input
                 type="text"
@@ -123,8 +181,43 @@ export default function SpaceRegister() {
                 value={formData.title}
                 onChange={handleChange}
                 placeholder="예: 홍대입구역 도보 3분 모던 듀얼모니터석"
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm focus:border-orange-500 focus:outline-none"
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3.5 text-sm focus:border-orange-500 focus:outline-none"
               />
+            </div>
+
+            {/* 오피스 사진 다중 업로드 드롭존 */}
+            <div className="flex flex-col gap-2">
+              <label className="text-xs text-zinc-400 font-medium">오피스 사진 등록 (최대 10장)</label>
+              <div className="grid grid-cols-4 gap-2 mt-1">
+                {/* 썸네일 미리보기 리스트 */}
+                {previewUrls.map((url, idx) => (
+                  <div key={idx} className="aspect-square relative rounded-xl overflow-hidden border border-zinc-700 bg-zinc-800">
+                    <img src={url} alt="미리보기" className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => removeFile(idx)}
+                      className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center text-[10px] font-bold hover:bg-black transition"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+
+                {/* 사진 파일 추가 버튼 */}
+                {previewUrls.length < 10 && (
+                  <label className="aspect-square rounded-xl border-2 border-dashed border-zinc-700 bg-zinc-900/40 hover:bg-zinc-800 hover:border-orange-500/40 flex flex-col items-center justify-center gap-1 cursor-pointer transition">
+                    <span className="text-lg">📸</span>
+                    <span className="text-[9px] text-zinc-400 font-bold">사진 추가</span>
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      onChange={handleFileChange}
+                      className="hidden"
+                    />
+                  </label>
+                )}
+              </div>
             </div>
 
             <div className="flex flex-col gap-2">
@@ -133,7 +226,7 @@ export default function SpaceRegister() {
                 name="description"
                 value={formData.description}
                 onChange={handleChange}
-                rows={5}
+                rows={4}
                 placeholder="테이블의 넓이, 소음 정도, 주변 편의시설 등 상세한 정보를 적어 주세요."
                 className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-sm focus:border-orange-500 focus:outline-none resize-none"
               />

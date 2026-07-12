@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Space } from './entities/space.entity';
 import { SpaceAmenity } from './entities/space-amenity.entity';
+import { SpaceImage } from './entities/space-image.entity';
 import { CreateSpaceDto } from './dto/create-space.dto';
 
 @Injectable()
@@ -12,6 +13,8 @@ export class SpacesService {
     private readonly spaceRepository: Repository<Space>,
     @InjectRepository(SpaceAmenity)
     private readonly amenityRepository: Repository<SpaceAmenity>,
+    @InjectRepository(SpaceImage)
+    private readonly imageRepository: Repository<SpaceImage>,
   ) {}
 
   /**
@@ -48,6 +51,22 @@ export class SpacesService {
       
       // 최신 편의시설 목록 바인딩
       savedSpace.amenities = amenityEntities;
+    }
+
+    // 3. 이미지 정보가 주어지면 매핑하여 추가 저장
+    if (dto.images && dto.images.length > 0) {
+      const imageEntities = dto.images.map((url, idx) =>
+        this.imageRepository.create({
+          spaceId: savedSpace.id,
+          url,
+          isPrimary: idx === 0, // 첫 번째 이미지를 대표 이미지로 설정
+          sortOrder: idx,
+        }),
+      );
+      await this.imageRepository.save(imageEntities);
+      
+      // 이미지 목록 바인딩
+      savedSpace.images = imageEntities;
     }
 
     return savedSpace;

@@ -13,4 +13,5 @@ export class CreateSpaceDto {
   priceMonthly?: number;
   isInstantBook?: boolean;
   amenities?: AmenityType[];
+  images?: string[];
 }
