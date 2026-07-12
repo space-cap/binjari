@@ -76,7 +76,7 @@ export default function Home() {
     }
   }, [isMapView]);
 
-  // 카카오 지도 초기화 및 마커 렌더링
+  // 카카오맵 SDK 동적 주입 및 지도 초기화 통합 훅
   useEffect(() => {
     if (!isMapView || !mapContainerRef.current) return;
 
@@ -85,6 +85,9 @@ export default function Home() {
       if (!kakao || !kakao.maps) return;
 
       kakao.maps.load(() => {
+        const container = mapContainerRef.current;
+        if (!container) return;
+
         // 기본 서울 시청 중심부 좌표
         const defaultCenter = new kakao.maps.LatLng(37.5665, 126.9780);
         
@@ -93,7 +96,7 @@ export default function Home() {
           center: defaultCenter,
           level: 4,
         };
-        const mapInstance = new kakao.maps.Map(mapContainerRef.current, mapOptions);
+        const mapInstance = new kakao.maps.Map(container, mapOptions);
         mapRef.current = mapInstance;
         setMapLoaded(true);
 
@@ -104,30 +107,32 @@ export default function Home() {
       });
     };
 
-    // 브라우저에 카카오 맵 SDK가 마운트될 때까지 대기 후 실행
-    const checkKakaoMap = setInterval(() => {
-      const kakao = (window as any).kakao;
-      if (kakao && kakao.maps) {
-        clearInterval(checkKakaoMap);
-        initializeMap();
-      }
-    }, 100);
-
-    return () => clearInterval(checkKakaoMap);
-  }, [isMapView]);
-
-  // 카카오맵 SDK 동적 주입
-  useEffect(() => {
-    if (!isMapView) return;
+    const kakao = (window as any).kakao;
+    if (kakao && kakao.maps && kakao.maps.load) {
+      initializeMap();
+      return;
+    }
 
     const existingScript = document.getElementById("kakao-map-sdk");
-    if (existingScript) return;
-
-    const script = document.createElement("script");
-    script.id = "kakao-map-sdk";
-    script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${process.env.NEXT_PUBLIC_KAKAO_MAP_CLIENT_KEY}&autoload=false`;
-    script.async = true;
-    document.head.appendChild(script);
+    if (!existingScript) {
+      const script = document.createElement("script");
+      script.id = "kakao-map-sdk";
+      script.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${process.env.NEXT_PUBLIC_KAKAO_MAP_CLIENT_KEY}&autoload=false`;
+      script.async = true;
+      script.onload = () => {
+        initializeMap();
+      };
+      document.head.appendChild(script);
+    } else {
+      const checkInterval = setInterval(() => {
+        const k = (window as any).kakao;
+        if (k && k.maps && k.maps.load) {
+          clearInterval(checkInterval);
+          initializeMap();
+        }
+      }, 100);
+      return () => clearInterval(checkInterval);
+    }
   }, [isMapView]);
 
   // 공간 리스트가 변경되거나 지도 초기화 완료 시 마커를 지도 위에 맵핑
