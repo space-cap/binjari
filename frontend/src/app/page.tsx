@@ -295,13 +295,13 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* 예약/상세보기 */}
-              <button 
-                onClick={() => alert(`${selectedSpace.title} 예약 기능은 준비 중입니다!`)}
-                className="btn-primary px-4 py-2.5 rounded-lg text-xs font-bold"
+              {/* 상세보기 링크 연계 */}
+              <Link 
+                href={`/spaces/${selectedSpace.id}`}
+                className="btn-primary px-4 py-2.5 rounded-lg text-xs font-bold text-center"
               >
-                예약
-              </button>
+                상세보기
+              </Link>
             </div>
           </div>
         )}

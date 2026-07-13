@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, UseGuards, UseInterceptors, UploadedFiles } from '@nestjs/common';
+import { Controller, Post, Get, Body, UseGuards, UseInterceptors, UploadedFiles, Param } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { SpacesService } from './spaces.service';
 import { CreateSpaceDto } from './dto/create-space.dto';
@@ -40,5 +40,13 @@ export class SpacesController {
   @Get()
   async findAll() {
     return this.spacesService.findAll();
+  }
+
+  /**
+   * 단일 오피스 공간 상세 조회
+   */
+  @Get(':id')
+  async findOne(@Param('id') id: string) {
+    return this.spacesService.findOneSpace(id);
   }
 }

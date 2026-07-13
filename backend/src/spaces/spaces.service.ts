@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, OnModuleInit, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Space } from './entities/space.entity';
@@ -231,5 +231,24 @@ export class SpacesService implements OnModuleInit {
         amenities: true,
       },
     });
+  }
+
+  /**
+   * 단일 오피스 공간 상세 조회
+   */
+  async findOneSpace(id: string): Promise<Space> {
+    const space = await this.spaceRepository.findOne({
+      where: { id },
+      relations: {
+        images: true,
+        amenities: true,
+      },
+    });
+
+    if (!space) {
+      throw new NotFoundException('요청하신 공간 정보를 찾을 수 없습니다.');
+    }
+
+    return space;
   }
 }
