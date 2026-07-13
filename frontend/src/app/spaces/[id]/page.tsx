@@ -21,6 +21,22 @@ interface SpaceDetail {
   images: { url: string; isPrimary: boolean }[];
 }
 
+interface ReviewItem {
+  id: string;
+  rating: number;
+  comment: string;
+  createdAt: string;
+  user: {
+    name: string;
+    email: string;
+  };
+}
+
+interface StatsInfo {
+  avgRating: number;
+  reviewCount: number;
+}
+
 export default function SpaceDetail() {
   const { id } = useParams();
   const router = useRouter();
@@ -28,6 +44,10 @@ export default function SpaceDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
+
+  // 리뷰 및 집계 평점 상태
+  const [reviews, setReviews] = useState<ReviewItem[]>([]);
+  const [stats, setStats] = useState<StatsInfo | null>(null);
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
@@ -64,7 +84,7 @@ export default function SpaceDetail() {
         }),
       });
 
-      alert("🎉 예약 신청이 완료되었습니다!\n마커 상세 위치에서 실시간 예약 현황을 반영합니다.");
+      alert("🎉 예약 신청이 완료되었습니다!\n결제 화면으로 리다이렉트되어 최종 확정을 돕습니다.");
       setShowBookingModal(false);
       router.push("/bookings/my");
     } catch (err: any) {
@@ -74,20 +94,26 @@ export default function SpaceDetail() {
     }
   };
 
-  // 공간 단일 상세 정보 로드
+  // 공간 정보 + 누적 평점 통계 + 후기 피드 목록 통합 로드
   useEffect(() => {
     if (!id) return;
-    const loadDetail = async () => {
+    const loadDetailData = async () => {
       try {
-        const data = await fetchApi(`/spaces/${id}`);
-        setSpace(data);
+        const [spaceData, reviewsData, statsData] = await Promise.all([
+          fetchApi(`/spaces/${id}`),
+          fetchApi(`/reviews/space/${id}`),
+          fetchApi(`/reviews/space/${id}/stats`),
+        ]);
+        setSpace(spaceData);
+        setReviews(reviewsData || []);
+        setStats(statsData || null);
       } catch (err: any) {
         setError(err.message || "공간 정보를 불러오지 못했습니다.");
       } finally {
         setLoading(false);
       }
     };
-    loadDetail();
+    loadDetailData();
   }, [id]);
 
   // 상세 페이지용 미니 카카오 맵 초기화 훅
@@ -246,7 +272,7 @@ export default function SpaceDetail() {
             )}
           </>
         ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center text-zinc-600 font-bold text-sm">
+          <div className="w-full h-full flex flex-col items-center justify-center text-zinc-650 font-bold text-sm">
             <span>등록된 사진이 없습니다.</span>
           </div>
         )}
@@ -264,6 +290,10 @@ export default function SpaceDetail() {
             <span>수용 {space.capacity}석</span>
             <span>•</span>
             <span>즉시 예약 {space.isInstantBook ? "가능 ⚡" : "대기 ⏳"}</span>
+            <span>•</span>
+            <span className="text-amber-400 font-bold">
+              ⭐ {stats && stats.reviewCount > 0 ? `${stats.avgRating} (${stats.reviewCount}개 후기)` : "첫 후기 남기기"}
+            </span>
           </div>
         </div>
 
@@ -311,6 +341,40 @@ export default function SpaceDetail() {
             ref={mapContainerRef}
             className="w-full h-44 rounded-2xl bg-zinc-900 border border-zinc-850 overflow-hidden z-0"
           />
+        </div>
+
+        <hr className="border-zinc-900" />
+
+        {/* 후기 피드 영역 */}
+        <div className="flex flex-col gap-3 pb-4">
+          <h3 className="text-xs font-bold text-zinc-300">이용 후기 및 평점</h3>
+          {reviews.length > 0 ? (
+            <div className="flex flex-col gap-3">
+              {reviews.map((rev) => (
+                <div
+                  key={rev.id}
+                  className="p-4 rounded-2xl bg-zinc-900 border border-zinc-850 flex flex-col gap-2"
+                >
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-bold text-zinc-300">
+                      {rev.user.name || "익명 게스트"}
+                    </span>
+                    <span className="text-[10px] text-amber-400 font-bold">
+                      {"★".repeat(rev.rating)}{"☆".repeat(5 - rev.rating)}
+                    </span>
+                  </div>
+                  <p className="text-xs text-zinc-400 leading-relaxed">{rev.comment}</p>
+                  <span className="text-[9px] text-zinc-600 self-end">
+                    {new Date(rev.createdAt).toLocaleDateString()}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-xs text-zinc-500 py-3">
+              아직 작성된 이용 후기가 없습니다. 첫 이용자가 되어 생생한 후기를 남겨주셔요!
+            </p>
+          )}
         </div>
       </div>
 

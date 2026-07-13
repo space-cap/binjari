@@ -77,6 +77,7 @@ export class BookingsService {
         space: {
           images: true,
         },
+        review: true,
       },
       order: {
         createdAt: 'DESC',

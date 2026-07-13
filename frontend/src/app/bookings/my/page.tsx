@@ -19,6 +19,11 @@ interface BookingItem {
     priceDaily: number;
     images: { url: string; isPrimary: boolean }[];
   };
+  review?: {
+    id: string;
+    rating: number;
+    comment: string;
+  } | null;
 }
 
 export default function MyBookings() {
@@ -27,12 +32,20 @@ export default function MyBookings() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // 결제 관련 상태 모아두기
+  // 결제 관련 상태
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<BookingItem | null>(null);
   const [paymentMethod, setPaymentMethod] = useState("card");
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
+
+  // 리뷰/평점 관련 상태
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [selectedBookingForReview, setSelectedBookingForReview] = useState<BookingItem | null>(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
 
   const loadMyBookings = async () => {
     try {
@@ -74,13 +87,45 @@ export default function MyBookings() {
 
       alert(`🎉 결제가 완료되었습니다!\n[${selectedBooking.space.title}] 예약이 최종 확정되었습니다!`);
       setShowPaymentModal(false);
-      
-      // 실시간 상태 반영을 위해 목록 새로고침
       await loadMyBookings();
     } catch (err: any) {
       setPaymentError(err.message || "결제 승인 처리 도중 에러가 발생했습니다.");
     } finally {
       setPaymentLoading(false);
+    }
+  };
+
+  // 평점 후기(리뷰) 등록 요청 처리
+  const handleReviewSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedBookingForReview) return;
+    if (!reviewComment.trim()) {
+      setReviewError("한 줄 이용 후기를 입력해 주세요.");
+      return;
+    }
+
+    setReviewLoading(true);
+    setReviewError(null);
+
+    try {
+      await fetchApi("/reviews", {
+        method: "POST",
+        body: JSON.stringify({
+          bookingId: selectedBookingForReview.id,
+          rating: reviewRating,
+          comment: reviewComment,
+        }),
+      });
+
+      alert("🎉 소중한 오피스 후기가 성공적으로 등록되었습니다!\n별점 점수 평균에 실시간 누적 반영됩니다.");
+      setShowReviewModal(false);
+      setReviewComment("");
+      setReviewRating(5);
+      await loadMyBookings(); // 리로드하여 즉시 후기 완료 상태 변경
+    } catch (err: any) {
+      setReviewError(err.message || "후기 등록 도중 서버 에러가 발생했습니다.");
+    } finally {
+      setReviewLoading(false);
     }
   };
 
@@ -105,7 +150,7 @@ export default function MyBookings() {
     }
   };
 
-  // 취소 가능 여부 판별 헬퍼 (오늘 날짜 이후이면서 cancelled가 아닐 때)
+  // 취소 가능 여부 판별 헬퍼
   const isCancelable = (checkInDate: string, status: string) => {
     if (status === "cancelled") return false;
     const today = new Date();
@@ -267,6 +312,28 @@ export default function MyBookings() {
                     결제하고 예약 확정하기 💳
                   </button>
                 )}
+
+                {/* 이용 완료된 예약 하단에 별점 평점 등록 기능 노출 */}
+                {item.status === "confirmed" && !item.review && (
+                  <button
+                    onClick={() => {
+                      setSelectedBookingForReview(item);
+                      setReviewRating(5);
+                      setReviewComment("");
+                      setReviewError(null);
+                      setShowReviewModal(true);
+                    }}
+                    className="w-full border border-orange-500/30 text-orange-500 bg-orange-500/5 hover:bg-orange-500/10 text-[10px] font-bold py-2.5 rounded-xl transition"
+                  >
+                    이용 후기 별점 남기기 ⭐
+                  </button>
+                )}
+
+                {item.status === "confirmed" && item.review && (
+                  <div className="w-full text-center py-2.5 rounded-xl bg-zinc-900 border border-zinc-850 text-zinc-500 text-[10px] font-bold">
+                    후기 작성 완료 ✓ (별점: {item.review.rating}점)
+                  </div>
+                )}
               </div>
             );
           })
@@ -292,7 +359,6 @@ export default function MyBookings() {
       {showPaymentModal && selectedBooking && (
         <div className="fixed inset-0 z-20 bg-black/70 flex items-end justify-center px-4 max-w-[450px] mx-auto">
           <div className="w-full bg-zinc-900 border-t border-zinc-800 rounded-t-3xl p-6 flex flex-col gap-5 animate-slideUp z-30">
-            {/* 헤더 */}
             <div className="flex justify-between items-center pb-2 border-b border-zinc-800">
               <h2 className="text-sm font-bold">대여 요금 가상 결제</h2>
               <button
@@ -304,9 +370,7 @@ export default function MyBookings() {
               </button>
             </div>
 
-            {/* 본문 폼 */}
             <form onSubmit={handlePaymentSubmit} className="flex flex-col gap-5">
-              {/* 예약 상품 요약 */}
               <div className="flex flex-col gap-1.5 p-4 rounded-2xl bg-zinc-850 border border-zinc-800">
                 <span className="text-[9px] text-orange-500 font-bold uppercase tracking-wider">
                   {selectedBooking.space.addressSummary}
@@ -320,7 +384,6 @@ export default function MyBookings() {
                 </div>
               </div>
 
-              {/* 결제수단 선택 */}
               <div className="flex flex-col gap-2">
                 <label className="text-[10px] text-zinc-400 font-bold">결제 수단 선택</label>
                 <div className="grid grid-cols-2 gap-2">
@@ -349,7 +412,6 @@ export default function MyBookings() {
                 </div>
               </div>
 
-              {/* 총 금액 */}
               <div className="flex justify-between items-center p-4 rounded-xl bg-orange-500/5 border border-orange-500/10 mt-1">
                 <span className="text-xs text-zinc-400 font-semibold">총 결제 대금</span>
                 <span className="text-md font-extrabold text-orange-500">
@@ -363,13 +425,90 @@ export default function MyBookings() {
                 </div>
               )}
 
-              {/* 승인 단추 */}
               <button
                 type="submit"
                 disabled={paymentLoading}
                 className="w-full btn-primary py-4 text-xs font-bold rounded-xl disabled:opacity-40 shadow-lg"
               >
                 {paymentLoading ? "결제 승인 중..." : "결제 승인 완료하기 💳"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 이용 후기 및 별점 등록 팝업 모달 오버레이 */}
+      {showReviewModal && selectedBookingForReview && (
+        <div className="fixed inset-0 z-20 bg-black/70 flex items-end justify-center px-4 max-w-[450px] mx-auto">
+          <div className="w-full bg-zinc-900 border-t border-zinc-800 rounded-t-3xl p-6 flex flex-col gap-5 animate-slideUp z-30">
+            {/* 헤더 */}
+            <div className="flex justify-between items-center pb-2 border-b border-zinc-800">
+              <h2 className="text-sm font-bold">공간 이용 별점/후기 남기기</h2>
+              <button
+                type="button"
+                onClick={() => setShowReviewModal(false)}
+                className="text-zinc-400 hover:text-white text-xs"
+              >
+                닫기
+              </button>
+            </div>
+
+            {/* 입력 폼 */}
+            <form onSubmit={handleReviewSubmit} className="flex flex-col gap-5">
+              <div className="flex flex-col gap-1.5 p-4 rounded-2xl bg-zinc-850 border border-zinc-800">
+                <span className="text-[9px] text-zinc-400 font-medium">대여 완료 오피스</span>
+                <h4 className="text-xs font-bold text-white truncate">
+                  {selectedBookingForReview.space.title}
+                </h4>
+              </div>
+
+              {/* 별점 1~5 정수 선택 라디오 */}
+              <div className="flex flex-col gap-2 items-center">
+                <label className="text-[10px] text-zinc-400 font-bold self-start">공간 만족도 별점</label>
+                <div className="flex gap-2.5 py-2">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setReviewRating(star)}
+                      className="text-2xl transition-transform active:scale-125"
+                    >
+                      {star <= reviewRating ? "⭐" : "☆"}
+                    </button>
+                  ))}
+                </div>
+                <span className="text-xs text-orange-500 font-bold">
+                  {reviewRating}점 / 5점
+                </span>
+              </div>
+
+              {/* 이용평 작성 */}
+              <div className="flex flex-col gap-2">
+                <label className="text-[10px] text-zinc-400 font-bold">한 줄 이용 후기</label>
+                <textarea
+                  value={reviewComment}
+                  onChange={(e) => setReviewComment(e.target.value)}
+                  placeholder="공간의 청결도, 분위기, 통신 상태 등 솔직한 한 줄 후기를 남겨주셔요!"
+                  maxLength={100}
+                  rows={3}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-xs focus:border-orange-500 focus:outline-none resize-none placeholder-zinc-550"
+                  required
+                />
+              </div>
+
+              {reviewError && (
+                <div className="text-[10px] text-red-400 font-semibold text-center">
+                  ⚠️ {reviewError}
+                </div>
+              )}
+
+              {/* 제출 */}
+              <button
+                type="submit"
+                disabled={reviewLoading}
+                className="w-full btn-primary py-4 text-xs font-bold rounded-xl disabled:opacity-40 shadow-lg"
+              >
+                {reviewLoading ? "후기 등록 중..." : "후기 평점 등록 완료 ⭐"}
               </button>
             </form>
           </div>
