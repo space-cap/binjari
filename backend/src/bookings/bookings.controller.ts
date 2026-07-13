@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Get, Body, UseGuards, HttpCode, HttpStatus, Param } from '@nestjs/common';
 import { BookingsService } from './bookings.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -31,5 +31,18 @@ export class BookingsController {
   @HttpCode(HttpStatus.OK)
   async findMyBookings(@CurrentUser() user: User) {
     return this.bookingsService.findMyBookings(user.id);
+  }
+
+  /**
+   * POST /v1/bookings/:id/cancel
+   * 본인의 예약 취소 요청 (로그인 유저 전용 + 안티 어뷰징)
+   */
+  @Post(':id/cancel')
+  @HttpCode(HttpStatus.OK)
+  async cancel(
+    @CurrentUser() user: User,
+    @Param('id') bookingId: string,
+  ) {
+    return this.bookingsService.cancelBooking(user.id, bookingId);
   }
 }

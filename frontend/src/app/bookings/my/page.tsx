@@ -84,6 +84,36 @@ export default function MyBookings() {
     }
   };
 
+  // 예약 취소 비동기 요청 처리
+  const handleCancelBooking = async (bookingId: string, spaceTitle: string) => {
+    if (
+      !window.confirm(
+        `정말로 [${spaceTitle}] 예약을 취소하시겠습니까?\n(일일 예약 취소 제한은 최대 5회까지만 허용됩니다.)`,
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await fetchApi(`/bookings/${bookingId}/cancel`, {
+        method: "POST",
+      });
+      alert("🎉 예약 취소가 완료되었습니다.");
+      await loadMyBookings();
+    } catch (err: any) {
+      alert(err.message || "예약 취소 도중 에러가 발생했습니다.");
+    }
+  };
+
+  // 취소 가능 여부 판별 헬퍼 (오늘 날짜 이후이면서 cancelled가 아닐 때)
+  const isCancelable = (checkInDate: string, status: string) => {
+    if (status === "cancelled") return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const bookingDate = new Date(checkInDate);
+    return bookingDate >= today;
+  };
+
   // 이미지 절대 주소 보정 헬퍼
   const getImageUrl = (url: string) => {
     if (!url) return "";
@@ -193,7 +223,18 @@ export default function MyBookings() {
                       <span className="text-[10px] text-zinc-400 font-medium">
                         {item.space.addressSummary}
                       </span>
-                      {renderStatusBadge(item.status)}
+                      <div className="flex items-center gap-2">
+                        {isCancelable(item.checkInDate, item.status) && (
+                          <button
+                            type="button"
+                            onClick={() => handleCancelBooking(item.id, item.space.title)}
+                            className="text-[10px] text-zinc-500 hover:text-red-400 font-semibold underline transition cursor-pointer"
+                          >
+                            예약 취소
+                          </button>
+                        )}
+                        {renderStatusBadge(item.status)}
+                      </div>
                     </div>
                     
                     <h3 className="text-xs font-bold text-white truncate pr-1">

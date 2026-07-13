@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, MoreThanOrEqual } from 'typeorm';
 import { Booking, BookingStatus } from './entities/booking.entity';
 import { Space } from '../spaces/entities/space.entity';
 import { CreateBookingDto } from './dto/create-booking.dto';
@@ -82,5 +82,56 @@ export class BookingsService {
         createdAt: 'DESC',
       },
     });
+  }
+
+  /**
+   * 예약 취소 및 어뷰징 차단 필터
+   */
+  async cancelBooking(userId: string, bookingId: string): Promise<Booking> {
+    // 1. 예약 로드
+    const booking = await this.bookingRepository.findOne({ where: { id: bookingId } });
+    if (!booking) {
+      throw new NotFoundException('취소 대상인 예약 정보를 찾을 수 없습니다.');
+    }
+
+    // 2. 본인 소유권 검사
+    if (booking.userId !== userId) {
+      throw new ForbiddenException('본인의 예약 내역만 취소하실 수 있습니다.');
+    }
+
+    // 3. 이미 취소 상태인 경우 중복 취소 차단
+    if (booking.status === BookingStatus.CANCELLED) {
+      throw new BadRequestException('이미 취소 처리 완료된 예약 건입니다.');
+    }
+
+    // 4. 과거 및 당일 이용 시점 검사
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const bookingDate = new Date(booking.checkInDate);
+    if (bookingDate < today) {
+      throw new BadRequestException('이용일이 시작되었거나 이미 지난 예약은 취소하실 수 없습니다.');
+    }
+
+    // 5. 일일 예약 취소 횟수(최대 5회) 제한 검사 (어뷰징 가드)
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const todayCancelCount = await this.bookingRepository.count({
+      where: {
+        userId,
+        status: BookingStatus.CANCELLED,
+        updatedAt: MoreThanOrEqual(startOfDay),
+      },
+    });
+
+    if (todayCancelCount >= 5) {
+      throw new BadRequestException(
+        '하루에 취소 가능한 최대 횟수(5회)를 초과하여 임시 차단되었습니다. 고객센터에 문의해 주세요.',
+      );
+    }
+
+    // 6. 취소 완료 처리
+    booking.status = BookingStatus.CANCELLED;
+    return this.bookingRepository.save(booking);
   }
 }
