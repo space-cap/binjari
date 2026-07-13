@@ -6,6 +6,7 @@ import { Space } from './entities/space.entity';
 import { SpaceImage } from './entities/space-image.entity';
 import { SpaceAmenity } from './entities/space-amenity.entity';
 import { SpaceAvailability } from './entities/space-availability.entity';
+import { User } from '../users/entities/user.entity';
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { SpaceAvailability } from './entities/space-availability.entity';
       SpaceImage,
       SpaceAmenity,
       SpaceAvailability,
+      User,
     ]),
   ],
   controllers: [SpacesController],
