@@ -256,6 +256,12 @@ export default function Home() {
             >
               공간 등록 🔗
             </Link>
+            <Link
+              href="/bookings/my"
+              className="text-zinc-400 hover:text-white transition font-medium"
+            >
+              내 예약
+            </Link>
             <button
               onClick={handleLogout}
               className="text-zinc-400 hover:text-white transition"

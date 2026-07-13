@@ -66,7 +66,7 @@ export default function SpaceDetail() {
 
       alert("🎉 예약 신청이 완료되었습니다!\n마커 상세 위치에서 실시간 예약 현황을 반영합니다.");
       setShowBookingModal(false);
-      router.push("/");
+      router.push("/bookings/my");
     } catch (err: any) {
       setBookingError(err.message || "예약 신청 처리 중 서버 에러가 발생했습니다.");
     } finally {
