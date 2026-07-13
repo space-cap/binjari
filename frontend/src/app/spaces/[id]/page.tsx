@@ -35,6 +35,45 @@ export default function SpaceDetail() {
   // 이미지 갤러리 현재 활성화 썸네일 인덱스
   const [currentImgIndex, setCurrentImgIndex] = useState(0);
 
+  // 예약 설정 모달 상태 관리
+  const [showBookingModal, setShowBookingModal] = useState(false);
+  const [bookingDate, setBookingDate] = useState("");
+  const [bookingSeats, setBookingSeats] = useState(1);
+  const [bookingLoading, setBookingLoading] = useState(false);
+  const [bookingError, setBookingError] = useState<string | null>(null);
+
+  // 예약 신청 요청 처리 핸들러
+  const handleBookingSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bookingDate) {
+      setBookingError("이용 예약일을 선택해 주세요.");
+      return;
+    }
+    if (!space) return;
+
+    setBookingLoading(true);
+    setBookingError(null);
+
+    try {
+      await fetchApi("/bookings", {
+        method: "POST",
+        body: JSON.stringify({
+          spaceId: space.id,
+          checkInDate: bookingDate,
+          seatCount: bookingSeats,
+        }),
+      });
+
+      alert("🎉 예약 신청이 완료되었습니다!\n마커 상세 위치에서 실시간 예약 현황을 반영합니다.");
+      setShowBookingModal(false);
+      router.push("/");
+    } catch (err: any) {
+      setBookingError(err.message || "예약 신청 처리 중 서버 에러가 발생했습니다.");
+    } finally {
+      setBookingLoading(false);
+    }
+  };
+
   // 공간 단일 상세 정보 로드
   useEffect(() => {
     if (!id) return;
@@ -284,12 +323,101 @@ export default function SpaceDetail() {
           </span>
         </div>
         <button
-          onClick={() => alert("예약 기능은 다음 마일스톤에 추가됩니다! 조금만 기다려 주셔요!")}
+          onClick={() => {
+            const today = new Date().toISOString().split("T")[0];
+            setBookingDate(today);
+            setBookingSeats(1);
+            setBookingError(null);
+            setShowBookingModal(true);
+          }}
           className="btn-primary px-5 py-3.5 rounded-xl text-xs font-bold shadow-lg"
         >
           예약 신청하기 ⚡
         </button>
       </div>
+
+      {/* 예약 상세 옵션 모달 오버레이 */}
+      {showBookingModal && (
+        <div className="fixed inset-0 z-20 bg-black/70 flex items-end justify-center px-4 max-w-[450px] mx-auto">
+          <div className="w-full bg-zinc-900 border-t border-zinc-800 rounded-t-3xl p-6 flex flex-col gap-6 animate-slideUp z-30">
+            {/* 헤더 */}
+            <div className="flex justify-between items-center pb-2 border-b border-zinc-800">
+              <h2 className="text-sm font-bold">대여 정보 및 예약 신청</h2>
+              <button
+                type="button"
+                onClick={() => setShowBookingModal(false)}
+                className="text-zinc-400 hover:text-white text-xs"
+              >
+                닫기
+              </button>
+            </div>
+
+            {/* 입력 폼 */}
+            <form onSubmit={handleBookingSubmit} className="flex flex-col gap-5">
+              {/* 예약일 지정 */}
+              <div className="flex flex-col gap-2">
+                <label className="text-[10px] text-zinc-400 font-bold">대여 이용일 선택</label>
+                <input
+                  type="date"
+                  value={bookingDate}
+                  min={new Date().toISOString().split("T")[0]}
+                  onChange={(e) => setBookingDate(e.target.value)}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-xs focus:border-orange-500 focus:outline-none"
+                  required
+                />
+              </div>
+
+              {/* 이용석 수량 조절 */}
+              <div className="flex flex-col gap-2">
+                <label className="text-[10px] text-zinc-400 font-bold">대여 좌석 수 (최대 {space.capacity}석)</label>
+                <div className="flex items-center gap-4 mt-1 bg-zinc-850 border border-zinc-750 rounded-xl px-4 py-2 justify-between">
+                  <span className="text-xs font-semibold text-zinc-400">이용 인원석</span>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setBookingSeats(prev => Math.max(1, prev - 1))}
+                      className="w-8 h-8 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-white font-bold flex items-center justify-center text-sm"
+                    >
+                      -
+                    </button>
+                    <span className="text-sm font-bold text-white min-w-[20px] text-center">{bookingSeats}</span>
+                    <button
+                      type="button"
+                      onClick={() => setBookingSeats(prev => Math.min(space.capacity, prev + 1))}
+                      className="w-8 h-8 rounded-lg bg-zinc-700 hover:bg-zinc-600 text-white font-bold flex items-center justify-center text-sm"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* 실시간 최종 예상 금액 표기 */}
+              <div className="flex justify-between items-center p-4 rounded-xl bg-orange-500/5 border border-orange-500/10 mt-1">
+                <span className="text-xs text-zinc-400 font-medium">최종 예상 결제 금액</span>
+                <span className="text-sm font-extrabold text-orange-500">
+                  ₩{(space.priceDaily * bookingSeats).toLocaleString()}
+                </span>
+              </div>
+
+              {bookingError && (
+                <div className="text-[11px] text-red-400 font-medium text-center">
+                  ⚠️ {bookingError}
+                </div>
+              )}
+
+              {/* 제출 */}
+              <button
+                type="submit"
+                disabled={bookingLoading}
+                className="w-full btn-primary py-4 text-xs font-bold rounded-xl mt-2 disabled:opacity-40"
+              >
+                {bookingLoading ? "예약 요청 중..." : "예약 최종 신청 완료 ⚡"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
