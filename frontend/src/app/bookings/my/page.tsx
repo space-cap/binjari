@@ -39,7 +39,7 @@ export default function MyBookings() {
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
 
-  // 리뷰/평점 관련 상태 (기본값을 5.0 실수형으로 설정)
+  // 리뷰/평점 관련 상태
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [selectedBookingForReview, setSelectedBookingForReview] = useState<BookingItem | null>(null);
   const [reviewRating, setReviewRating] = useState(5.0);
@@ -117,7 +117,7 @@ export default function MyBookings() {
         }),
       });
 
-      alert("🎉 소중한 오피스 후기가 성공적으로 등록되었습니다!\n별점 점수 평균에 실시간 누적 반영됩니다.");
+      alert("🎉 소중한 오피스 후기가 성공적으로 등록되었습니다!");
       setShowReviewModal(false);
       setReviewComment("");
       setReviewRating(5.0);
@@ -159,22 +159,38 @@ export default function MyBookings() {
     return bookingDate >= today;
   };
 
-  // 0.5점 단위 채워진 반 별(🌗) 드로잉 헬퍼
-  const renderStars = (rating: number) => {
-    const stars = [];
-    const floor = Math.floor(rating);
-    const hasHalf = rating % 1 !== 0;
+  // 고급 SVG 별 렌더러 (0.5 단위 절반 별 렌더링 지원)
+  const renderStars = (rating: number, sizeClass = "w-3.5 h-3.5") => {
+    return (
+      <div className="flex items-center gap-0.5 select-none">
+        {[1, 2, 3, 4, 5].map((starValue) => {
+          const isFull = rating >= starValue;
+          const isHalf = rating === starValue - 0.5;
 
-    for (let i = 1; i <= 5; i++) {
-      if (i <= floor) {
-        stars.push("★");
-      } else if (i === floor + 1 && hasHalf) {
-        stars.push("🌗");
-      } else {
-        stars.push("☆");
-      }
-    }
-    return stars.join("");
+          return (
+            <div key={starValue} className={`relative ${sizeClass} flex-shrink-0`}>
+              <svg className="w-full h-full" viewBox="0 0 24 24" fill="none">
+                {/* 비어있는 뒷배경 별 */}
+                <path
+                  d="M12 17.27L18.18 21L16.54 13.97L22 9.24L14.81 8.62L12 2L9.19 8.62L2 9.24L7.45 13.97L5.82 21L12 17.27Z"
+                  fill="#27272a"
+                  stroke="#3f3f46"
+                  strokeWidth="1.5"
+                />
+                {/* 채워지는 주황/노랑 별 */}
+                {(isFull || isHalf) && (
+                  <path
+                    d="M12 17.27L18.18 21L16.54 13.97L22 9.24L14.81 8.62L12 2L9.19 8.62L2 9.24L7.45 13.97L5.82 21L12 17.27Z"
+                    fill="#f59e0b"
+                    clipPath={isHalf ? "url(#half-clip-my-bookings)" : undefined}
+                  />
+                )}
+              </svg>
+            </div>
+          );
+        })}
+      </div>
+    );
   };
 
   // 이미지 절대 주소 보정 헬퍼
@@ -228,6 +244,15 @@ export default function MyBookings() {
 
   return (
     <div className="flex flex-col flex-1 bg-zinc-950 text-white min-h-screen px-5 py-8 relative">
+      {/* 클립패스 정의 SVG (반 별 조각 커팅용) */}
+      <svg className="w-0 h-0 absolute">
+        <defs>
+          <clipPath id="half-clip-my-bookings">
+            <rect x="0" y="0" width="12" height="24" />
+          </clipPath>
+        </defs>
+      </svg>
+
       {/* 헤더 */}
       <header className="flex justify-between items-center mb-6">
         <button
@@ -348,9 +373,9 @@ export default function MyBookings() {
                 )}
 
                 {item.status === "confirmed" && item.review && (
-                  <div className="w-full text-center py-2.5 rounded-xl bg-zinc-900 border border-zinc-850 text-zinc-500 text-[10px] font-bold flex justify-center items-center gap-1.5">
+                  <div className="w-full text-center py-2.5 rounded-xl bg-zinc-900 border border-zinc-850 text-zinc-500 text-[10px] font-bold flex justify-center items-center gap-2">
                     <span>후기 작성 완료 ✓</span>
-                    <span className="text-amber-400">{renderStars(item.review.rating)}</span>
+                    {renderStars(item.review.rating, "w-3 h-3")}
                     <span>({item.review.rating.toFixed(1)}점)</span>
                   </div>
                 )}
@@ -482,28 +507,56 @@ export default function MyBookings() {
                 </h4>
               </div>
 
-              {/* 0.5점 단위 슬라이더 조작 영역 */}
-              <div className="flex flex-col gap-2 items-center">
+              {/* [UI 개선] 슬라이더를 완전히 없애고, 별 자체를 왼쪽 반/오른쪽 반 눌러서 0.5단위 조절하는 프리미엄 평점판 */}
+              <div className="flex flex-col gap-2.5 items-center bg-zinc-950 py-4.5 px-4 rounded-2xl border border-zinc-850">
                 <label className="text-[10px] text-zinc-400 font-bold self-start">공간 만족도 별점</label>
-                <div className="flex gap-2 py-1 items-center justify-center w-full">
-                  <span className="text-3xl tracking-wide select-none text-amber-400 font-bold">
-                    {renderStars(reviewRating)}
+                
+                {/* 터치/클릭 인식 별점 세팅 */}
+                <div className="flex items-center justify-center gap-1.5 py-1">
+                  {[1, 2, 3, 4, 5].map((starValue) => {
+                    const isFull = reviewRating >= starValue;
+                    const isHalf = reviewRating === starValue - 0.5;
+
+                    return (
+                      <div key={starValue} className="relative w-9 h-9 flex-shrink-0 cursor-pointer transition-transform active:scale-110">
+                        {/* 왼쪽 절반 클릭 영역 (0.5점 하향) */}
+                        <div
+                          onClick={() => setReviewRating(starValue - 0.5)}
+                          className="absolute left-0 top-0 w-1/2 h-full z-10"
+                        />
+                        {/* 오른쪽 절반 클릭 영역 (정수 입력) */}
+                        <div
+                          onClick={() => setReviewRating(starValue)}
+                          className="absolute right-0 top-0 w-1/2 h-full z-10"
+                        />
+
+                        {/* 모던 SVG 별 드로잉 */}
+                        <svg className="w-full h-full" viewBox="0 0 24 24" fill="none">
+                          <path
+                            d="M12 17.27L18.18 21L16.54 13.97L22 9.24L14.81 8.62L12 2L9.19 8.62L2 9.24L7.45 13.97L5.82 21L12 17.27Z"
+                            fill="#27272a"
+                            stroke="#4b5563"
+                            strokeWidth="1.5"
+                          />
+                          {(isFull || isHalf) && (
+                            <path
+                              d="M12 17.27L18.18 21L16.54 13.97L22 9.24L14.81 8.62L12 2L9.19 8.62L2 9.24L7.45 13.97L5.82 21L12 17.27Z"
+                              fill="#f59e0b"
+                              clipPath={isHalf ? "url(#half-clip-my-bookings)" : undefined}
+                            />
+                          )}
+                        </svg>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="flex flex-col items-center gap-0.5 mt-1">
+                  <span className="text-sm font-extrabold text-orange-500">
+                    {reviewRating.toFixed(1)}점 / 5.0점
                   </span>
+                  <span className="text-[9px] text-zinc-500 font-medium">별의 왼쪽을 누르면 0.5점, 오른쪽을 누르면 1.0점 단위로 매겨집니다.</span>
                 </div>
-                <div className="w-full px-2 mt-1">
-                  <input
-                    type="range"
-                    min="0.5"
-                    max="5.0"
-                    step="0.5"
-                    value={reviewRating}
-                    onChange={(e) => setReviewRating(parseFloat(e.target.value))}
-                    className="w-full accent-orange-500 bg-zinc-800 rounded-lg appearance-none h-2 cursor-pointer"
-                  />
-                </div>
-                <span className="text-xs text-orange-500 font-bold mt-1">
-                  {reviewRating.toFixed(1)}점 / 5.0점
-                </span>
               </div>
 
               {/* 이용평 작성 */}

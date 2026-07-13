@@ -232,26 +232,51 @@ export default function SpaceDetail() {
     return `${backendBase}${url}`;
   };
 
-  // 0.5점 단위 채워진 반 별(🌗) 드로잉 헬퍼
+  // 0.5점 단위 채워진 반 별(🌗) 드로잉 헬퍼 (SVG 마스크 기법)
   const renderStars = (rating: number) => {
-    const stars = [];
-    const floor = Math.floor(rating);
-    const hasHalf = rating % 1 !== 0;
+    return (
+      <div className="flex items-center gap-0.5 select-none">
+        {[1, 2, 3, 4, 5].map((starValue) => {
+          const isFull = rating >= starValue;
+          const isHalf = rating === starValue - 0.5;
 
-    for (let i = 1; i <= 5; i++) {
-      if (i <= floor) {
-        stars.push("★");
-      } else if (i === floor + 1 && hasHalf) {
-        stars.push("🌗");
-      } else {
-        stars.push("☆");
-      }
-    }
-    return stars.join("");
+          return (
+            <div key={starValue} className="relative w-3.5 h-3.5 flex-shrink-0">
+              <svg className="w-full h-full" viewBox="0 0 24 24" fill="none">
+                {/* 비어있는 뒷배경 별 */}
+                <path
+                  d="M12 17.27L18.18 21L16.54 13.97L22 9.24L14.81 8.62L12 2L9.19 8.62L2 9.24L7.45 13.97L5.82 21L12 17.27Z"
+                  fill="#27272a"
+                  stroke="#3f3f46"
+                  strokeWidth="1.5"
+                />
+                {/* 채워지는 주황/노랑 별 */}
+                {(isFull || isHalf) && (
+                  <path
+                    d="M12 17.27L18.18 21L16.54 13.97L22 9.24L14.81 8.62L12 2L9.19 8.62L2 9.24L7.45 13.97L5.82 21L12 17.27Z"
+                    fill="#f59e0b"
+                    clipPath={isHalf ? "url(#half-clip-detail)" : undefined}
+                  />
+                )}
+              </svg>
+            </div>
+          );
+        })}
+      </div>
+    );
   };
 
   return (
     <div className="flex flex-col flex-1 bg-zinc-950 text-white min-h-screen pb-[84px] relative">
+      {/* 클립패스 정의 SVG (반 별 조각 커팅용) */}
+      <svg className="w-0 h-0 absolute">
+        <defs>
+          <clipPath id="half-clip-detail">
+            <rect x="0" y="0" width="12" height="24" />
+          </clipPath>
+        </defs>
+      </svg>
+
       {/* 뒤로가기 플로팅 버튼 */}
       <button
         onClick={() => router.back()}
