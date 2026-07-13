@@ -9,6 +9,7 @@ import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { SpacesModule } from './spaces/spaces.module';
 import { BookingsModule } from './bookings/bookings.module';
+import { PaymentsModule } from './payments/payments.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { BookingsModule } from './bookings/bookings.module';
     AuthModule,
     SpacesModule,
     BookingsModule,
+    PaymentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

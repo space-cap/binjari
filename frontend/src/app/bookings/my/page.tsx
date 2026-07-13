@@ -27,28 +27,62 @@ export default function MyBookings() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // 결제 관련 상태 모아두기
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedBooking, setSelectedBooking] = useState<BookingItem | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState("card");
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+
+  const loadMyBookings = async () => {
+    try {
+      const data = await fetchApi("/bookings/my");
+      setBookings(data || []);
+    } catch (err: any) {
+      setError(err.message || "예약 내역을 가져오지 못했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    // 세션 인증 체크
     const token = localStorage.getItem("access_token");
     if (!token) {
       alert("로그인이 필요합니다.");
       router.replace("/");
       return;
     }
-
-    const loadMyBookings = async () => {
-      try {
-        const data = await fetchApi("/bookings/my");
-        setBookings(data || []);
-      } catch (err: any) {
-        setError(err.message || "예약 내역을 가져오지 못했습니다.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadMyBookings();
   }, [router]);
+
+  // 가상 결제 승인 전송 처리
+  const handlePaymentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedBooking) return;
+
+    setPaymentLoading(true);
+    setPaymentError(null);
+
+    try {
+      await fetchApi("/payments", {
+        method: "POST",
+        body: JSON.stringify({
+          bookingId: selectedBooking.id,
+          paymentMethod: paymentMethod,
+        }),
+      });
+
+      alert(`🎉 결제가 완료되었습니다!\n[${selectedBooking.space.title}] 예약이 최종 확정되었습니다!`);
+      setShowPaymentModal(false);
+      
+      // 실시간 상태 반영을 위해 목록 새로고침
+      await loadMyBookings();
+    } catch (err: any) {
+      setPaymentError(err.message || "결제 승인 처리 도중 에러가 발생했습니다.");
+    } finally {
+      setPaymentLoading(false);
+    }
+  };
 
   // 이미지 절대 주소 보정 헬퍼
   const getImageUrl = (url: string) => {
@@ -60,13 +94,13 @@ export default function MyBookings() {
     return `${backendBase}${url}`;
   };
 
-  // 날짜 가독성 변환
+  // 날짜 변환 헬퍼
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr);
     return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`;
   };
 
-  // 상태값 한글 라벨 및 스타일 뱃지 맵핑
+  // 상태 배지 컴포넌트 맵핑
   const renderStatusBadge = (status: BookingItem["status"]) => {
     const styles: Record<BookingItem["status"], { label: string; class: string }> = {
       pending: {
@@ -134,51 +168,69 @@ export default function MyBookings() {
             return (
               <div
                 key={item.id}
-                className="p-4 rounded-2xl glass border border-zinc-850 flex gap-4 items-center"
+                className="p-4 rounded-2xl glass border border-zinc-850 flex flex-col gap-3"
               >
-                {/* 썸네일 */}
-                <div className="w-16 h-16 rounded-xl overflow-hidden bg-zinc-800 flex-shrink-0 relative">
-                  {primaryImg ? (
-                    <img
-                      src={getImageUrl(primaryImg.url)}
-                      alt={item.space.title}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center font-bold text-xs text-zinc-600 bg-zinc-900">
-                      BINJARI
+                {/* 상단 오피스 요약 정보 레이아웃 */}
+                <div className="flex gap-4 items-center">
+                  {/* 썸네일 */}
+                  <div className="w-16 h-16 rounded-xl overflow-hidden bg-zinc-800 flex-shrink-0 relative">
+                    {primaryImg ? (
+                      <img
+                        src={getImageUrl(primaryImg.url)}
+                        alt={item.space.title}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center font-bold text-xs text-zinc-650 bg-zinc-900">
+                        BINJARI
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 상세 텍스트 */}
+                  <div className="flex-1 min-w-0 flex flex-col gap-1">
+                    <div className="flex justify-between items-start">
+                      <span className="text-[10px] text-zinc-400 font-medium">
+                        {item.space.addressSummary}
+                      </span>
+                      {renderStatusBadge(item.status)}
                     </div>
-                  )}
-                </div>
+                    
+                    <h3 className="text-xs font-bold text-white truncate pr-1">
+                      {item.space.title}
+                    </h3>
 
-                {/* 정보 */}
-                <div className="flex-1 min-w-0 flex flex-col gap-1">
-                  <div className="flex justify-between items-start">
-                    <span className="text-[10px] text-zinc-400 font-medium">
-                      {item.space.addressSummary}
-                    </span>
-                    {renderStatusBadge(item.status)}
-                  </div>
-                  
-                  <h3 className="text-xs font-bold text-white truncate pr-1">
-                    {item.space.title}
-                  </h3>
+                    <div className="text-[10px] text-zinc-400 flex flex-col gap-0.5 mt-0.5 font-medium">
+                      <span>이용 날짜: {formatDate(item.checkInDate)}</span>
+                      <span>대여 인원: {item.seatCount}석 대여</span>
+                    </div>
 
-                  <div className="text-[10px] text-zinc-400 flex flex-col gap-0.5 mt-0.5 font-medium">
-                    <span>이용 날짜: {formatDate(item.checkInDate)}</span>
-                    <span>대여 인원: {item.seatCount}석 대여</span>
-                  </div>
-
-                  <div className="text-xs font-extrabold text-orange-500 mt-1 flex justify-between items-center">
-                    <span>최종 요금</span>
-                    <span>₩{Number(item.totalPrice).toLocaleString()}</span>
+                    <div className="text-xs font-extrabold text-orange-500 mt-1 flex justify-between items-center">
+                      <span>최종 요금</span>
+                      <span>₩{Number(item.totalPrice).toLocaleString()}</span>
+                    </div>
                   </div>
                 </div>
+
+                {/* 대기중일 때만 활성화되는 결제하기 버튼 */}
+                {item.status === "pending" && (
+                  <button
+                    onClick={() => {
+                      setSelectedBooking(item);
+                      setPaymentMethod("card");
+                      setPaymentError(null);
+                      setShowPaymentModal(true);
+                    }}
+                    className="w-full border border-orange-500/30 text-orange-500 bg-orange-500/5 hover:bg-orange-500/10 text-[10px] font-bold py-2.5 rounded-xl transition"
+                  >
+                    결제하고 예약 확정하기 💳
+                  </button>
+                )}
               </div>
             );
           })
         ) : (
-          /* 내역 부재 시 */
+          /* 내역 부재 폴백 */
           <div className="flex flex-col items-center justify-center py-20 text-center gap-6">
             <span className="text-3xl animate-bounce">📭</span>
             <div className="flex flex-col gap-1.5">
@@ -194,6 +246,94 @@ export default function MyBookings() {
           </div>
         )}
       </main>
+
+      {/* 가상 카드 결제 팝업 모달 오버레이 */}
+      {showPaymentModal && selectedBooking && (
+        <div className="fixed inset-0 z-20 bg-black/70 flex items-end justify-center px-4 max-w-[450px] mx-auto">
+          <div className="w-full bg-zinc-900 border-t border-zinc-800 rounded-t-3xl p-6 flex flex-col gap-5 animate-slideUp z-30">
+            {/* 헤더 */}
+            <div className="flex justify-between items-center pb-2 border-b border-zinc-800">
+              <h2 className="text-sm font-bold">대여 요금 가상 결제</h2>
+              <button
+                type="button"
+                onClick={() => setShowPaymentModal(false)}
+                className="text-zinc-400 hover:text-white text-xs"
+              >
+                닫기
+              </button>
+            </div>
+
+            {/* 본문 폼 */}
+            <form onSubmit={handlePaymentSubmit} className="flex flex-col gap-5">
+              {/* 예약 상품 요약 */}
+              <div className="flex flex-col gap-1.5 p-4 rounded-2xl bg-zinc-850 border border-zinc-800">
+                <span className="text-[9px] text-orange-500 font-bold uppercase tracking-wider">
+                  {selectedBooking.space.addressSummary}
+                </span>
+                <h4 className="text-xs font-bold text-white truncate">
+                  {selectedBooking.space.title}
+                </h4>
+                <div className="text-[10px] text-zinc-400 mt-1 flex justify-between">
+                  <span>날짜: {formatDate(selectedBooking.checkInDate)}</span>
+                  <span>좌석: {selectedBooking.seatCount}석</span>
+                </div>
+              </div>
+
+              {/* 결제수단 선택 */}
+              <div className="flex flex-col gap-2">
+                <label className="text-[10px] text-zinc-400 font-bold">결제 수단 선택</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod("card")}
+                    className={`py-3 rounded-xl text-xs font-bold border transition ${
+                      paymentMethod === "card"
+                        ? "border-orange-500 bg-orange-500/5 text-orange-500"
+                        : "border-zinc-800 bg-zinc-850 text-zinc-400"
+                    }`}
+                  >
+                    💳 신용/체크카드
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod("kakao_pay")}
+                    className={`py-3 rounded-xl text-xs font-bold border transition ${
+                      paymentMethod === "kakao_pay"
+                        ? "border-orange-500 bg-orange-500/5 text-orange-500"
+                        : "border-zinc-800 bg-zinc-850 text-zinc-400"
+                    }`}
+                  >
+                    💛 카카오페이 (가상)
+                  </button>
+                </div>
+              </div>
+
+              {/* 총 금액 */}
+              <div className="flex justify-between items-center p-4 rounded-xl bg-orange-500/5 border border-orange-500/10 mt-1">
+                <span className="text-xs text-zinc-400 font-semibold">총 결제 대금</span>
+                <span className="text-md font-extrabold text-orange-500">
+                  ₩{Number(selectedBooking.totalPrice).toLocaleString()}
+                </span>
+              </div>
+
+              {paymentError && (
+                <div className="text-[10px] text-red-400 font-semibold text-center">
+                  ⚠️ {paymentError}
+                </div>
+              )}
+
+              {/* 승인 단추 */}
+              <button
+                type="submit"
+                disabled={paymentLoading}
+                className="w-full btn-primary py-4 text-xs font-bold rounded-xl disabled:opacity-40 shadow-lg"
+              >
+                {paymentLoading ? "결제 승인 중..." : "결제 승인 완료하기 💳"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
