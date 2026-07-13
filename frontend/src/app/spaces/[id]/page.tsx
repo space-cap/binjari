@@ -232,6 +232,24 @@ export default function SpaceDetail() {
     return `${backendBase}${url}`;
   };
 
+  // 0.5점 단위 채워진 반 별(🌗) 드로잉 헬퍼
+  const renderStars = (rating: number) => {
+    const stars = [];
+    const floor = Math.floor(rating);
+    const hasHalf = rating % 1 !== 0;
+
+    for (let i = 1; i <= 5; i++) {
+      if (i <= floor) {
+        stars.push("★");
+      } else if (i === floor + 1 && hasHalf) {
+        stars.push("🌗");
+      } else {
+        stars.push("☆");
+      }
+    }
+    return stars.join("");
+  };
+
   return (
     <div className="flex flex-col flex-1 bg-zinc-950 text-white min-h-screen pb-[84px] relative">
       {/* 뒤로가기 플로팅 버튼 */}
@@ -360,7 +378,7 @@ export default function SpaceDetail() {
                       {rev.user.name || "익명 게스트"}
                     </span>
                     <span className="text-[10px] text-amber-400 font-bold">
-                      {"★".repeat(rev.rating)}{"☆".repeat(5 - rev.rating)}
+                      {renderStars(rev.rating)}
                     </span>
                   </div>
                   <p className="text-xs text-zinc-400 leading-relaxed">{rev.comment}</p>

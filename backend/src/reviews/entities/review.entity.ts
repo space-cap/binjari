@@ -26,7 +26,7 @@ export class Review {
   @Column({ name: 'booking_id' })
   bookingId: string;
 
-  @Column({ type: 'integer' })
+  @Column({ type: 'float' })
   rating: number;
 
   @Column({ type: 'text' })

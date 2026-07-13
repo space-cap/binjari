@@ -39,10 +39,10 @@ export default function MyBookings() {
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
 
-  // 리뷰/평점 관련 상태
+  // 리뷰/평점 관련 상태 (기본값을 5.0 실수형으로 설정)
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [selectedBookingForReview, setSelectedBookingForReview] = useState<BookingItem | null>(null);
-  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewRating, setReviewRating] = useState(5.0);
   const [reviewComment, setReviewComment] = useState("");
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewError, setReviewError] = useState<string | null>(null);
@@ -120,8 +120,8 @@ export default function MyBookings() {
       alert("🎉 소중한 오피스 후기가 성공적으로 등록되었습니다!\n별점 점수 평균에 실시간 누적 반영됩니다.");
       setShowReviewModal(false);
       setReviewComment("");
-      setReviewRating(5);
-      await loadMyBookings(); // 리로드하여 즉시 후기 완료 상태 변경
+      setReviewRating(5.0);
+      await loadMyBookings();
     } catch (err: any) {
       setReviewError(err.message || "후기 등록 도중 서버 에러가 발생했습니다.");
     } finally {
@@ -157,6 +157,24 @@ export default function MyBookings() {
     today.setHours(0, 0, 0, 0);
     const bookingDate = new Date(checkInDate);
     return bookingDate >= today;
+  };
+
+  // 0.5점 단위 채워진 반 별(🌗) 드로잉 헬퍼
+  const renderStars = (rating: number) => {
+    const stars = [];
+    const floor = Math.floor(rating);
+    const hasHalf = rating % 1 !== 0;
+
+    for (let i = 1; i <= 5; i++) {
+      if (i <= floor) {
+        stars.push("★");
+      } else if (i === floor + 1 && hasHalf) {
+        stars.push("🌗");
+      } else {
+        stars.push("☆");
+      }
+    }
+    return stars.join("");
   };
 
   // 이미지 절대 주소 보정 헬퍼
@@ -318,7 +336,7 @@ export default function MyBookings() {
                   <button
                     onClick={() => {
                       setSelectedBookingForReview(item);
-                      setReviewRating(5);
+                      setReviewRating(5.0);
                       setReviewComment("");
                       setReviewError(null);
                       setShowReviewModal(true);
@@ -330,8 +348,10 @@ export default function MyBookings() {
                 )}
 
                 {item.status === "confirmed" && item.review && (
-                  <div className="w-full text-center py-2.5 rounded-xl bg-zinc-900 border border-zinc-850 text-zinc-500 text-[10px] font-bold">
-                    후기 작성 완료 ✓ (별점: {item.review.rating}점)
+                  <div className="w-full text-center py-2.5 rounded-xl bg-zinc-900 border border-zinc-850 text-zinc-500 text-[10px] font-bold flex justify-center items-center gap-1.5">
+                    <span>후기 작성 완료 ✓</span>
+                    <span className="text-amber-400">{renderStars(item.review.rating)}</span>
+                    <span>({item.review.rating.toFixed(1)}점)</span>
                   </div>
                 )}
               </div>
@@ -462,23 +482,27 @@ export default function MyBookings() {
                 </h4>
               </div>
 
-              {/* 별점 1~5 정수 선택 라디오 */}
+              {/* 0.5점 단위 슬라이더 조작 영역 */}
               <div className="flex flex-col gap-2 items-center">
                 <label className="text-[10px] text-zinc-400 font-bold self-start">공간 만족도 별점</label>
-                <div className="flex gap-2.5 py-2">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <button
-                      key={star}
-                      type="button"
-                      onClick={() => setReviewRating(star)}
-                      className="text-2xl transition-transform active:scale-125"
-                    >
-                      {star <= reviewRating ? "⭐" : "☆"}
-                    </button>
-                  ))}
+                <div className="flex gap-2 py-1 items-center justify-center w-full">
+                  <span className="text-3xl tracking-wide select-none text-amber-400 font-bold">
+                    {renderStars(reviewRating)}
+                  </span>
                 </div>
-                <span className="text-xs text-orange-500 font-bold">
-                  {reviewRating}점 / 5점
+                <div className="w-full px-2 mt-1">
+                  <input
+                    type="range"
+                    min="0.5"
+                    max="5.0"
+                    step="0.5"
+                    value={reviewRating}
+                    onChange={(e) => setReviewRating(parseFloat(e.target.value))}
+                    className="w-full accent-orange-500 bg-zinc-800 rounded-lg appearance-none h-2 cursor-pointer"
+                  />
+                </div>
+                <span className="text-xs text-orange-500 font-bold mt-1">
+                  {reviewRating.toFixed(1)}점 / 5.0점
                 </span>
               </div>
 

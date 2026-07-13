@@ -40,9 +40,12 @@ export class ReviewsService {
       throw new BadRequestException('이미 해당 예약 내역에 대해 후기 별점을 등록하셨습니다.');
     }
 
-    // 5. 별점 점수 범위 검사 (1~5점)
-    if (dto.rating < 1 || dto.rating > 5) {
-      throw new BadRequestException('평점은 1점부터 5점 사이로만 부여할 수 있습니다.');
+    // 5. 별점 점수 범위 검사 (0.5~5점 및 0.5 단위 배수 검사)
+    if (dto.rating < 0.5 || dto.rating > 5) {
+      throw new BadRequestException('평점은 0.5점부터 5점 사이로만 부여할 수 있습니다.');
+    }
+    if (dto.rating % 0.5 !== 0) {
+      throw new BadRequestException('평점은 0.5점 단위로만 선택 가능합니다.');
     }
 
     // 6. 리뷰 원장 생성 및 저장
