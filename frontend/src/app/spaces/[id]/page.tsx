@@ -157,6 +157,16 @@ export default function SpaceDetail() {
     return maps[type] || type;
   };
 
+  // 이미지 절대 주소 보정 헬퍼 함수
+  const getImageUrl = (url: string) => {
+    if (!url) return "";
+    if (url.startsWith("http://") || url.startsWith("https://")) {
+      return url;
+    }
+    const backendBase = "http://localhost:4000";
+    return `${backendBase}${url}`;
+  };
+
   return (
     <div className="flex flex-col flex-1 bg-zinc-950 text-white min-h-screen pb-[84px] relative">
       {/* 뒤로가기 플로팅 버튼 */}
@@ -172,7 +182,7 @@ export default function SpaceDetail() {
         {sortedImages.length > 0 ? (
           <>
             <img
-              src={sortedImages[currentImgIndex].url}
+              src={getImageUrl(sortedImages[currentImgIndex].url)}
               alt={space.title}
               className="w-full h-full object-cover transition-all duration-300"
             />

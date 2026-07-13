@@ -217,6 +217,16 @@ export default function Home() {
     }
   };
 
+  // 이미지 절대 주소 보정 헬퍼 함수
+  const getImageUrl = (url: string) => {
+    if (!url) return "";
+    if (url.startsWith("http://") || url.startsWith("https://")) {
+      return url;
+    }
+    const backendBase = "http://localhost:4000";
+    return `${backendBase}${url}`;
+  };
+
   const handleLogout = () => {
     localStorage.removeItem("user");
     localStorage.removeItem("access_token");
@@ -266,7 +276,7 @@ export default function Home() {
               <div className="w-20 h-20 rounded-xl overflow-hidden bg-gradient-to-tr from-orange-500 to-amber-500 flex-shrink-0 flex items-center justify-center font-bold text-lg text-white">
                 {selectedSpace.images && selectedSpace.images[0] ? (
                   <img
-                    src={selectedSpace.images[0].url}
+                    src={getImageUrl(selectedSpace.images[0].url)}
                     alt={selectedSpace.title}
                     className="w-full h-full object-cover"
                   />
